@@ -1,0 +1,56 @@
+name: Release
+
+# 约束 5（ref 必须匹配）：必须由 tag push 触发，不要用 workflow_dispatch 或 release 事件
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write       # 用于 Attestation 签名（OIDC token）
+      contents: write        # 用于创建 Release
+      attestations: write    # 用于生成 Attestation
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # ubuntu-latest runner 已预装 Gradle，用它生成官方标准的 gradle-wrapper.jar，
+      # 避免在仓库里携带二进制 wrapper jar 文件。
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.2
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      # 把最终产物整理到统一目录，并加上版本号，方便 Release 页面识别
+      - name: Prepare release asset
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/WorkSandbox-${GITHUB_REF_NAME}.apk"
+
+      # 约束 1：subject-path 必须指向最终发布的产物文件（而非源码目录或中间产物）
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'dist/*.apk'
+
+      # 约束 2 + 3：使用默认 GITHUB_TOKEN（而非个人 PAT），由 action 上传（而非人工拖拽），
+      # 确保 Release 的 uploader 是 github-actions[bot]
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
+          generate_release_notes: true

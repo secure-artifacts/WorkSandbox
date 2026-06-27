@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    设备管理员策略声明。
+    这里不声明任何"限制类"策略（不限制相机、不限制密码策略等），
+    仅作为创建工作资料的最低必要条件。
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <!-- 工作资料的 Profile Owner 需要这个最基础的标记 -->
+        <limit-password />
+    </uses-policies>
+</device-admin>
