@@ -27,6 +27,22 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+
+    buildFeatures {
+        viewBinding true
+    }
+}
+
+// 修复：androidx.activity 等库内部依赖 Kotlin 标准库，不同传递依赖路径
+// 引入了不一致的版本（kotlin-stdlib 1.8.22 与旧的独立 kotlin-stdlib-jdk8 1.6.21
+// 同时存在），二者含有同名类，导致打包阶段报 "Duplicate class" 错误。
+// 强制统一所有 Kotlin 标准库相关 artifact 的版本，消除冲突。
+configurations.all {
+    resolutionStrategy {
+        force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'
+    }
 }
 
 dependencies {
