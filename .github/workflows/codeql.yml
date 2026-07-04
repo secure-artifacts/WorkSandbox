@@ -30,14 +30,15 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
-    # 严格匹配你的方案：初始化 CodeQL 并将 build-mode 设为 manual
+    # 初始化 CodeQL，开启调试输出以捕捉详细的底层抽取器日志
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: java-kotlin
         build-mode: manual
+        debug: true              # 👈 这里已经为你精准添加
 
-    # 严格匹配你的方案：执行手动编译，确保依赖树被完整、可重复地解析
+    # 执行手动编译，确保依赖树被完整、可重复地解析
     - name: Build
       run: |
         chmod +x ./gradlew
