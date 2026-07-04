@@ -15,14 +15,29 @@ jobs:
       attestations: write    # 用于生成 Attestation
 
     steps:
+      # 固定到具体 commit SHA 而非浮动的 @v4 tag，
+      # 防止上游 Action 仓库被劫持后影响你的构建产物（供应链安全最佳实践）。
+      # 下方 SHA 对应各 Action 当前的 v4/v2 发布版本，后续升级时同步更新注释里的版本号。
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@7a6d8a8234af8eb26422e24e3006232cccaa061b # v4.6.0
         with:
           java-version: '17'
           distribution: 'temurin'
+
+      # 缓存 Gradle 依赖与 wrapper，避免每次 tag 推送都重新下载全部依赖。
+      # key 基于 gradle 相关文件的哈希，依赖或 wrapper 版本变化时自动失效重建。
+      - name: Cache Gradle packages
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       # ubuntu-latest runner 已预装 Gradle，用它生成官方标准的 gradle-wrapper.jar，
       # 避免在仓库里携带二进制 wrapper jar 文件。
@@ -43,14 +58,14 @@ jobs:
 
       # 约束 1：subject-path 必须指向最终发布的产物文件（而非源码目录或中间产物）
       - name: Attest Build Provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@ce27ee6c9924000fdcc36f9cb4f8ad3b4de88dbd # v2.2.0
         with:
           subject-path: 'dist/*.apk'
 
       # 约束 2 + 3：使用默认 GITHUB_TOKEN（而非个人 PAT），由 action 上传（而非人工拖拽），
       # 确保 Release 的 uploader 是 github-actions[bot]
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c95fe1489396fe8a9a98087eba60ce4b17e94028 # v2.2.1
         with:
           files: dist/*.apk
           generate_release_notes: true
