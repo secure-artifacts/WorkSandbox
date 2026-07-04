@@ -17,6 +17,11 @@ import android.widget.Toast;
  */
 public class AdminReceiver extends DeviceAdminReceiver {
 
+    // 三星相册的系统包名（预装应用，非第三方 SDK）。
+    // 新建工作资料默认不会启用大部分系统应用，需要 Profile Owner 主动启用，
+    // 否则用户在工作资料桌面上会找不到相册图标，看起来像是"缺失"了。
+    private static final String SAMSUNG_GALLERY_PACKAGE = "com.sec.android.gallery3d";
+
     /** 工作资料创建成功后，系统会在新的工作资料内调用此方法 */
     @Override
     public void onProfileProvisioningComplete(Context context, Intent intent) {
@@ -27,11 +32,41 @@ public class AdminReceiver extends DeviceAdminReceiver {
         android.app.admin.DevicePolicyManager dpm =
                 (android.app.admin.DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
         android.content.ComponentName admin = getWho(context);
-        if (dpm != null) {
-            dpm.setProfileEnabled(admin);
+        try {
+            if (dpm != null) {
+                dpm.setProfileEnabled(admin);
+            }
+        } catch (SecurityException e) {
+            // 极少数定制系统可能限制此调用，静默失败即可，
+            // 不影响工作资料本身已由系统创建完成这一事实。
         }
 
+        enableSamsungGalleryIfPresent(context, dpm, admin);
+
         Toast.makeText(context, context.getString(R.string.toast_profile_ready), Toast.LENGTH_LONG).show();
+    }
+
+    /**
+     * 使用官方公开 API DevicePolicyManager#enableSystemApp(ComponentName, String) 启用
+     * 已随系统预装、但默认未在工作资料中启用的三星相册。
+     *
+     * 仅对"设备上已预装的系统应用"生效——该 API 不能安装任何设备上不存在的 APK，
+     * 因此非三星设备、或三星设备上相册被运营商精简掉的情况下，此调用会静默失败，
+     * 不影响工作资料本身的可用性。
+     */
+    private void enableSamsungGalleryIfPresent(Context context,
+                                                android.app.admin.DevicePolicyManager dpm,
+                                                android.content.ComponentName admin) {
+        if (dpm == null) {
+            return;
+        }
+        try {
+            dpm.enableSystemApp(admin, SAMSUNG_GALLERY_PACKAGE);
+        } catch (IllegalArgumentException e) {
+            // 该设备的系统镜像里没有这个包（非三星设备，或被精简），属预期情况，忽略即可。
+        } catch (SecurityException e) {
+            // 个别定制系统可能拒绝此调用，静默忽略，不影响主流程。
+        }
     }
 
     @Override

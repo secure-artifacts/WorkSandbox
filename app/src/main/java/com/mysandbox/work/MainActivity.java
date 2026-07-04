@@ -4,6 +4,8 @@ import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -74,22 +76,51 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        // 提前检测设备是否支持多用户/工作资料特性，避免直接抛出系统级异常，
+        // 给用户一个明确的中文提示而不是无响应或崩溃。
+        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_MANAGED_USERS)) {
+            Toast.makeText(this, getString(R.string.toast_provisioning_unsupported), Toast.LENGTH_LONG).show();
+            return;
+        }
+
         Intent intent = new Intent(DevicePolicyManager.ACTION_PROVISION_MANAGED_PROFILE);
         intent.putExtra(DevicePolicyManager.EXTRA_PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME, adminComponent);
-        intent.putExtra(DevicePolicyManager.EXTRA_PROVISIONING_SKIP_ENCRYPTION, true);
+        // 注：EXTRA_PROVISIONING_SKIP_ENCRYPTION 自 Android 7.0 起已被系统忽略，
+        // 保留该字段没有实际效果，容易造成误解，故移除。
 
         try {
             provisioningLauncher.launch(intent);
         } catch (android.content.ActivityNotFoundException e) {
             Toast.makeText(this, getString(R.string.toast_provisioning_unsupported), Toast.LENGTH_LONG).show();
+        } catch (SecurityException e) {
+            // 部分定制系统（如企业已托管设备）可能拒绝二次创建工作资料
+            Toast.makeText(this, getString(R.string.toast_provisioning_unsupported), Toast.LENGTH_LONG).show();
         }
     }
 
-    /** 跳转到系统设置中的账户/工作资料管理页面，方便用户查看或移除工作资料 */
+    /**
+     * 跳转到系统设置中的账户/用户管理页面，方便用户查看或移除工作资料。
+     * 不同厂商 ROM 的入口不完全一致，因此按优先级依次尝试，
+     * 找不到对应页面时兜底跳到设置首页，而不是让用户無反应。
+     */
     private void openWorkProfileSettings() {
-        Intent intent = new Intent(android.provider.Settings.ACTION_SETTINGS);
+        String[] candidateActions = {
+                "android.settings.MANAGE_PROFILE_SETTINGS", // 部分系统的账户与用户管理页
+                android.provider.Settings.ACTION_SYNC_SETTINGS
+        };
+
+        for (String action : candidateActions) {
+            try {
+                startActivity(new Intent(action));
+                return;
+            } catch (android.content.ActivityNotFoundException ignored) {
+                // 尝试下一个候选 Action
+            }
+        }
+
+        // 都不支持时兜底跳转系统设置首页
         try {
-            startActivity(intent);
+            startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS));
         } catch (android.content.ActivityNotFoundException e) {
             Toast.makeText(this, getString(R.string.toast_settings_unavailable), Toast.LENGTH_SHORT).show();
         }
